@@ -1,11 +1,42 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'readme-docs'
+description: 'Upload docs to readme.com'
+author: 'Ben Greenier'
 inputs:
-  milliseconds: # change this
+  apiKey:
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+    description: 'Your readme.com API Key'
+  version:
+    required: true
+    description: 'Your readme.com project version you wish to upload docs into. See https://docs.readme.com/reference/getproject'
+  categorySlug:
+    required: true
+    description: 'The category slug to upload docs into. See https://docs.readme.com/reference/categories#getcategory'
+  titleRegex:
+    required: false
+    description: 'The regex we run for each file to determine the doc title. First capture group is used.'
+    # Default regex matches markdown h1 header (e.g. `# My Page` => `My Page`)
+    default: '#(.+)?'
+  path:
+    required: false
+    description: 'The file path(s) to upload. Globs supported. See https://github.com/actions/toolkit/tree/main/packages/glob'
+    # Default selects nothing, in case the user wants to use this action to simply clear a category
+    default: ''
+  additionalJson:
+    required: false
+    description: 'Json string to base requests off of. Overridden by other action inputs. See https://docs.readme.com/reference/getdoc'
+    default: '{}'
+  create:
+    required: false
+    description: 'Flag indicating if we should create new docs. See https://docs.readme.com/reference/createdoc'
+    default: 'true'
+  overwrite:
+    required: false
+    description: 'Flag indicating if we should overwrite existing docs. See https://docs.readme.com/reference/updatedoc'
+    default: 'false'
+  clear:
+    required: false
+    description: 'Flag indicating if we should clear the category of docs before creation. See https://docs.readme.com/reference/deletedoc'
+    default: 'false'
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
