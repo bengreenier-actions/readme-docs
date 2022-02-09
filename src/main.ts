@@ -49,7 +49,11 @@ async function run(): Promise<void> {
     // execute work
     await processRequest(inputs)
   } catch (error) {
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) {
+      core.setFailed(error.message)
+    } else {
+      core.setFailed(`Failed with error: ${error}`)
+    }
   }
 }
 

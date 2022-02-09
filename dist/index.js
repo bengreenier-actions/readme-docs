@@ -317,8 +317,12 @@ function run() {
             yield (0, lib_1.processRequest)(inputs);
         }
         catch (error) {
-            if (error instanceof Error)
+            if (error instanceof Error) {
                 core.setFailed(error.message);
+            }
+            else {
+                core.setFailed(`Failed with error: ${error}`);
+            }
         }
     });
 }
