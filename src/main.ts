@@ -46,6 +46,9 @@ async function run(): Promise<void> {
       }
     }
 
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify(inputs))
+
     // execute work
     await processRequest(inputs)
   } catch (error) {
@@ -60,4 +63,5 @@ async function run(): Promise<void> {
 }
 
 // begin - actions entrypoint
-run()
+// eslint-disable-next-line github/no-then
+run().catch(error => core.setFailed(`Failed with error: ${error}`))

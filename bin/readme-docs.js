@@ -26,6 +26,7 @@ console.log(`Using input: ${JSON.stringify(inputFile)}`)
 processRequest(inputFile).then(
   () => console.log('Complete.'),
   err => {
+    console.log(JSON.stringify(err))
     throw err
   }
 )

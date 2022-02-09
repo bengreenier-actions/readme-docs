@@ -313,6 +313,8 @@ function run() {
                     throw new InputMissingError(paramId);
                 }
             }
+            // eslint-disable-next-line no-console
+            console.log(JSON.stringify(inputs));
             // execute work
             yield (0, lib_1.processRequest)(inputs);
         }
@@ -330,7 +332,8 @@ function run() {
     });
 }
 // begin - actions entrypoint
-run();
+// eslint-disable-next-line github/no-then
+run().catch(error => core.setFailed(`Failed with error: ${error}`));
 
 
 /***/ }),
