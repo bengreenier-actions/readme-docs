@@ -313,10 +313,9 @@ function run() {
                     throw new InputMissingError(paramId);
                 }
             }
-            // eslint-disable-next-line no-console
-            console.log(JSON.stringify(inputs));
             // execute work
             yield (0, lib_1.processRequest)(inputs);
+            core.info('🚀 Complete.');
         }
         catch (error) {
             if (error instanceof Error) {

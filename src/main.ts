@@ -45,12 +45,10 @@ async function run(): Promise<void> {
         throw new InputMissingError(paramId)
       }
     }
-
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(inputs))
-
     // execute work
     await processRequest(inputs)
+
+    core.info('🚀 Complete.')
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message)
