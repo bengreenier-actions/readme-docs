@@ -51,6 +51,8 @@ async function run(): Promise<void> {
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message)
+    } else if (typeof error === 'object') {
+      core.setFailed(`Failed with error: ${JSON.stringify(error)}`)
     } else {
       core.setFailed(`Failed with error: ${error}`)
     }
