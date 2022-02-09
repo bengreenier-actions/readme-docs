@@ -330,6 +330,14 @@ function run() {
         }
     });
 }
+process.on('exit', (code) => {
+    if (code !== 0) {
+        core.setFailed(`Exiting with code: ${code}`);
+    }
+    else {
+        core.info(`Exiting with code: ${code}`);
+    }
+});
 // begin - actions entrypoint
 // eslint-disable-next-line github/no-then
 run().catch(error => core.setFailed(`Failed with error: ${error}`));
