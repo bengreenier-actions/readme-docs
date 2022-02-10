@@ -11,6 +11,14 @@ inputs:
   categorySlug:
     required: true
     description: 'The category slug to upload docs into. See https://docs.readme.com/reference/categories#getcategory'
+  parentSlug:
+    required: false
+    description: 'The parent doc slug (within the category) to upload docs into. See https://docs.readme.com/reference/getdoc'
+    default: ''
+  titlePrefix:
+    required: false
+    description: 'The prefix we prepend to each doc title.'
+    default: ''
   titleRegex:
     required: false
     description: 'The regex we run for each file to determine the doc title. First capture group is used.'

@@ -48,6 +48,7 @@ const fs_1 = __importDefault(__nccwpck_require__(5747));
 const path_1 = __importDefault(__nccwpck_require__(5622));
 const True = 'true';
 function processRequest(input) {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const options = {
             method: 'GET',
@@ -57,7 +58,8 @@ function processRequest(input) {
                 Authorization: `Basic ${input.apiKey}`
             }
         };
-        // we'll clear the category first if desired
+        let parentDocId = undefined;
+        // we'll clear first if desired
         if (input.clear === True) {
             core.info(`📃 Attempting category '${input.categorySlug}' enumeration...`);
             const docs = (yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/categories/${input.categorySlug}/docs`, options)
@@ -71,8 +73,21 @@ function processRequest(input) {
                 }
             }))
                 .then((res) => __awaiter(this, void 0, void 0, function* () { return yield res.json(); })));
-            const childDocs = docs.flatMap(d => d.children);
-            core.info(`📃 Found ${docs.length} docs with ${childDocs.length} children. Attempting category '${input.categorySlug}' clear...`);
+            let childDocs = docs.flatMap(d => d.children);
+            core.info(`📃 Found ${docs.length} category docs with ${childDocs.length} children.`);
+            if (input.parentSlug && input.parentSlug.length > 0) {
+                const parentDoc = docs.find(d => d.slug === input.parentSlug);
+                if (!parentDoc) {
+                    throw new Error(`❌ Unable to find parent doc ${input.parentSlug} under category ${input.categorySlug}`);
+                }
+                // update child docs to just those under parentSlug
+                parentDocId = parentDoc._id;
+                childDocs = parentDoc.children;
+                core.info(`📃 Limiting to ${input.parentSlug} with ${childDocs.length} children. Attempting to remove children...`);
+            }
+            else {
+                core.info(`Attempting '${input.categorySlug}' clear...`);
+            }
             yield Promise.all(childDocs.map((d) => __awaiter(this, void 0, void 0, function* () {
                 return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
                     if (!res.ok) {
@@ -85,22 +100,27 @@ function processRequest(input) {
                 }));
             })));
             core.info(`📃 Children destroyed`);
-            yield Promise.all(docs.map((d) => __awaiter(this, void 0, void 0, function* () {
-                return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
-                    if (!res.ok) {
-                        const body = yield res.text();
-                        throw new Error(`${res.status}: ${body}`);
-                    }
-                    else {
-                        return res;
-                    }
-                }));
-            })));
-            core.info(`📃 Parents destroyed`);
-            core.info(`📃 Category '${input.categorySlug}' cleared`);
+            if (!input.parentSlug || input.parentSlug.length === 0) {
+                yield Promise.all(docs.map((d) => __awaiter(this, void 0, void 0, function* () {
+                    return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                        if (!res.ok) {
+                            const body = yield res.text();
+                            throw new Error(`${res.status}: ${body}`);
+                        }
+                        else {
+                            return res;
+                        }
+                    }));
+                })));
+                core.info(`📃 Parents destroyed`);
+                core.info(`📃 Category '${input.categorySlug}' cleared`);
+            }
+            else {
+                core.info(`📃 Parent doc '${input.parentSlug}' cleared`);
+            }
         }
         else {
-            core.info(`📃 Skipping category clear (clear input was '${input.clear}')`);
+            core.info(`📃 Skipping clear (clear input was '${input.clear}' categorySlug was '${input.categorySlug}' parentSlug was '${input.parentSlug}')`);
         }
         // find all the docs from path
         const globber = yield glob.create(input.path);
@@ -124,8 +144,10 @@ function processRequest(input) {
             .then((res) => __awaiter(this, void 0, void 0, function* () { return yield res.json(); })));
         core.info(`📃 Attempting to parse titleRegex '${input.titleRegex}'`);
         const titleRegex = new RegExp(input.titleRegex);
+        const titlePrefix = (_a = input.titlePrefix) !== null && _a !== void 0 ? _a : '';
         core.info(`📃 Attempting to parse additionalJson '${input.additionalJson}'`);
-        const baseRequest = JSON.parse(input.additionalJson);
+        const baseRequest = parentDocId
+            ? Object.assign(Object.assign({}, JSON.parse(input.additionalJson)), { parentDoc: parentDocId }) : JSON.parse(input.additionalJson);
         core.info(`📃 Attempting to upload ${files.length} docs...`);
         // create a helper func for the creation/update work
         const createOrUpdate = (file) => __awaiter(this, void 0, void 0, function* () {
@@ -139,7 +161,7 @@ function processRequest(input) {
             try {
                 if (input.create === True) {
                     core.info(`📃 Attempting to create '${file}' as a document...`);
-                    yield (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: fileTitle, slug: path_1.default.basename(file, path_1.default.extname(file)).trim(), category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                    yield (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, slug: path_1.default.basename(file, path_1.default.extname(file)).trim(), category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);
@@ -162,7 +184,7 @@ function processRequest(input) {
                     core.info(`📃 Attempting to update '${file}' document...`);
                     yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${path_1.default
                         .basename(file, path_1.default.extname(file))
-                        .trim()}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: fileTitle, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                        .trim()}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);
@@ -171,6 +193,10 @@ function processRequest(input) {
                             return res;
                         }
                     }));
+                }
+                else if (input.create !== True) {
+                    // swallow
+                    core.warning(`⚠️  No documentation creation occurring - neither create '${input.create}' nor overwrite '${input.overwrite}' are true`);
                 }
                 else {
                     // rethrow
@@ -230,13 +256,17 @@ const paramNames = {
     apiKey: 'apiKey',
     version: 'version',
     categorySlug: 'categorySlug',
+    parentSlug: 'parentSlug',
     titleRegex: 'titleRegex',
+    titlePrefix: 'titlePrefix',
     path: 'path',
     additionalJson: 'additionalJson',
     create: 'create',
     overwrite: 'overwrite',
     clear: 'clear'
 };
+// params that are allowed to be empty
+const allowedEmptyParams = ['parentSlug', 'titlePrefix'];
 class InputMissingError extends Error {
     constructor(inputName) {
         super(`❌ Missing required input: ${inputName}`);
@@ -256,7 +286,8 @@ function run() {
             // this assumes that non-required action.yml inputs have default values
             for (const paramId in paramNames) {
                 if (!inputs[paramId] ||
-                    inputs[paramId].length === 0) {
+                    (inputs[paramId].length === 0 &&
+                        !allowedEmptyParams.includes(paramId))) {
                     throw new InputMissingError(paramId);
                 }
             }

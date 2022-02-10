@@ -9,13 +9,18 @@ const paramNames: RequestMap = {
   apiKey: 'apiKey',
   version: 'version',
   categorySlug: 'categorySlug',
+  parentSlug: 'parentSlug',
   titleRegex: 'titleRegex',
+  titlePrefix: 'titlePrefix',
   path: 'path',
   additionalJson: 'additionalJson',
   create: 'create',
   overwrite: 'overwrite',
   clear: 'clear'
 }
+
+// params that are allowed to be empty
+const allowedEmptyParams: (keyof RequestMap)[] = ['parentSlug', 'titlePrefix']
 
 class InputMissingError extends Error {
   constructor(inputName: string) {
@@ -40,11 +45,13 @@ async function run(): Promise<void> {
     for (const paramId in paramNames) {
       if (
         !inputs[paramId as RequestKey] ||
-        inputs[paramId as RequestKey].length === 0
+        (inputs[paramId as RequestKey].length === 0 &&
+          !allowedEmptyParams.includes(paramId as RequestKey))
       ) {
         throw new InputMissingError(paramId)
       }
     }
+
     // execute work
     await processRequest(inputs)
 

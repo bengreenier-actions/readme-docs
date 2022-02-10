@@ -111,7 +111,9 @@ export interface Request {
   apiKey: string
   version: string
   categorySlug: string
+  parentSlug?: string
   titleRegex: string
+  titlePrefix?: string
   path: string
   additionalJson: string
   create: string
@@ -133,7 +135,9 @@ export async function processRequest(input: Request): Promise<void> {
     }
   }
 
-  // we'll clear the category first if desired
+  let parentDocId: string | undefined = undefined
+
+  // we'll clear first if desired
   if (input.clear === True) {
     core.info(`📃 Attempting category '${input.categorySlug}' enumeration...`)
 
@@ -151,11 +155,31 @@ export async function processRequest(input: Request): Promise<void> {
       })
       .then(async res => await res.json())) as SlimDoc[]
 
-    const childDocs = docs.flatMap(d => d.children)
+    let childDocs = docs.flatMap(d => d.children)
 
     core.info(
-      `📃 Found ${docs.length} docs with ${childDocs.length} children. Attempting category '${input.categorySlug}' clear...`
+      `📃 Found ${docs.length} category docs with ${childDocs.length} children.`
     )
+
+    if (input.parentSlug && input.parentSlug.length > 0) {
+      const parentDoc = docs.find(d => d.slug === input.parentSlug)
+
+      if (!parentDoc) {
+        throw new Error(
+          `❌ Unable to find parent doc ${input.parentSlug} under category ${input.categorySlug}`
+        )
+      }
+
+      // update child docs to just those under parentSlug
+      parentDocId = parentDoc._id
+      childDocs = parentDoc.children
+
+      core.info(
+        `📃 Limiting to ${input.parentSlug} with ${childDocs.length} children. Attempting to remove children...`
+      )
+    } else {
+      core.info(`Attempting '${input.categorySlug}' clear...`)
+    }
 
     await Promise.all(
       childDocs.map(async d =>
@@ -175,27 +199,33 @@ export async function processRequest(input: Request): Promise<void> {
 
     core.info(`📃 Children destroyed`)
 
-    await Promise.all(
-      docs.map(async d =>
-        fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
-          ...options,
-          method: 'DELETE'
-        }).then(async res => {
-          if (!res.ok) {
-            const body = await res.text()
-            throw new Error(`${res.status}: ${body}`)
-          } else {
-            return res
-          }
-        })
+    if (!input.parentSlug || input.parentSlug.length === 0) {
+      await Promise.all(
+        docs.map(async d =>
+          fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
+            ...options,
+            method: 'DELETE'
+          }).then(async res => {
+            if (!res.ok) {
+              const body = await res.text()
+              throw new Error(`${res.status}: ${body}`)
+            } else {
+              return res
+            }
+          })
+        )
       )
-    )
 
-    core.info(`📃 Parents destroyed`)
+      core.info(`📃 Parents destroyed`)
 
-    core.info(`📃 Category '${input.categorySlug}' cleared`)
+      core.info(`📃 Category '${input.categorySlug}' cleared`)
+    } else {
+      core.info(`📃 Parent doc '${input.parentSlug}' cleared`)
+    }
   } else {
-    core.info(`📃 Skipping category clear (clear input was '${input.clear}')`)
+    core.info(
+      `📃 Skipping clear (clear input was '${input.clear}' categorySlug was '${input.categorySlug}' parentSlug was '${input.parentSlug}')`
+    )
   }
 
   // find all the docs from path
@@ -229,10 +259,13 @@ export async function processRequest(input: Request): Promise<void> {
 
   core.info(`📃 Attempting to parse titleRegex '${input.titleRegex}'`)
   const titleRegex = new RegExp(input.titleRegex)
+  const titlePrefix = input.titlePrefix ?? ''
 
   core.info(`📃 Attempting to parse additionalJson '${input.additionalJson}'`)
 
-  const baseRequest = JSON.parse(input.additionalJson)
+  const baseRequest = parentDocId
+    ? {...JSON.parse(input.additionalJson), parentDoc: parentDocId}
+    : JSON.parse(input.additionalJson)
 
   core.info(`📃 Attempting to upload ${files.length} docs...`)
 
@@ -259,7 +292,7 @@ export async function processRequest(input: Request): Promise<void> {
           headers: {...options.headers, 'Content-Type': 'application/json'},
           body: JSON.stringify({
             ...baseRequest,
-            title: fileTitle,
+            title: `${titlePrefix}${fileTitle}`,
             slug: path.basename(file, path.extname(file)).trim(),
             category: category._id,
             body: fileContents
@@ -293,7 +326,7 @@ export async function processRequest(input: Request): Promise<void> {
             headers: {...options.headers, 'Content-Type': 'application/json'},
             body: JSON.stringify({
               ...baseRequest,
-              title: fileTitle,
+              title: `${titlePrefix}${fileTitle}`,
               category: category._id,
               body: fileContents
             })
@@ -306,6 +339,11 @@ export async function processRequest(input: Request): Promise<void> {
             return res
           }
         })
+      } else if (input.create !== True) {
+        // swallow
+        core.warning(
+          `⚠️  No documentation creation occurring - neither create '${input.create}' nor overwrite '${input.overwrite}' are true`
+        )
       } else {
         // rethrow
         throw e

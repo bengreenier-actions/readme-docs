@@ -16,10 +16,14 @@ Action to upload docs to readme.com.
     version: 'v1.0.0'
     # The category slug to upload docs into (required)
     categorySlug: 'important-docs'
+    # The parent doc slug to upload docs into. Must be a doc under the categorySlug category (optional)
+    parentSlug: 'important-doc'
     # The file path(s) to upload. Globs supported (optional)
     # path: ''
     # The regex we run for each file to determine the doc title (optional)
     # titleRegex: '#(.+)?'
+    # The prefix we prepend to each title (optional)
+    # titlePrefix: ''
     # Json string to base requests off of (optional)
     # additionalJson: '{}'
     # Flag indicating if we should create new docs (optional)
