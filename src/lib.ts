@@ -1,7 +1,8 @@
+/* eslint-disable github/no-then */
 import 'global-agent/bootstrap'
 import * as core from '@actions/core'
 import * as glob from '@actions/glob'
-import api from 'api'
+import fetch from 'node-fetch-cjs'
 import fs from 'fs'
 import path from 'path'
 
@@ -123,17 +124,32 @@ export type RequestKey = keyof Request
 const True = 'true'
 
 export async function processRequest(input: Request): Promise<void> {
-  const sdk = api<ReadmeApi>('@developers/v2.0#5p9er16kx9dx3ib')
-
-  sdk.auth(input.apiKey)
+  const options = {
+    method: 'GET',
+    headers: {
+      'x-readme-version': input.version,
+      Accept: 'application/json',
+      Authorization: `Basic ${input.apiKey}`
+    }
+  }
 
   // we'll clear the category first if desired
   if (input.clear === True) {
     core.info(`📃 Attempting category '${input.categorySlug}' enumeration...`)
-    const docs = await sdk.getCategoryDocs({
-      slug: input.categorySlug,
-      'x-readme-version': input.version
-    })
+
+    const docs = (await fetch(
+      `https://dash.readme.com/api/v1/categories/${input.categorySlug}/docs`,
+      options
+    )
+      .then(async res => {
+        if (!res.ok) {
+          const body = await res.text()
+          throw new Error(`${res.status}: ${body}`)
+        } else {
+          return res
+        }
+      })
+      .then(async res => await res.json())) as SlimDoc[]
 
     const childDocs = docs.flatMap(d => d.children)
 
@@ -143,7 +159,17 @@ export async function processRequest(input: Request): Promise<void> {
 
     await Promise.all(
       childDocs.map(async d =>
-        sdk.deleteDoc({slug: d.slug, 'x-readme-version': input.version})
+        fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
+          ...options,
+          method: 'DELETE'
+        }).then(async res => {
+          if (!res.ok) {
+            const body = await res.text()
+            throw new Error(`${res.status}: ${body}`)
+          } else {
+            return res
+          }
+        })
       )
     )
 
@@ -151,7 +177,17 @@ export async function processRequest(input: Request): Promise<void> {
 
     await Promise.all(
       docs.map(async d =>
-        sdk.deleteDoc({slug: d.slug, 'x-readme-version': input.version})
+        fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
+          ...options,
+          method: 'DELETE'
+        }).then(async res => {
+          if (!res.ok) {
+            const body = await res.text()
+            throw new Error(`${res.status}: ${body}`)
+          } else {
+            return res
+          }
+        })
       )
     )
 
@@ -177,10 +213,19 @@ export async function processRequest(input: Request): Promise<void> {
 
   core.info(`📃 Attempting to get info for category '${input.categorySlug}'...`)
 
-  const category = await sdk.getCategory({
-    slug: input.categorySlug,
-    'x-readme-version': input.version
-  })
+  const category = (await fetch(
+    `https://dash.readme.com/api/v1/categories/${input.categorySlug}`,
+    options
+  )
+    .then(async res => {
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`${res.status}: ${body}`)
+      } else {
+        return res
+      }
+    })
+    .then(async res => await res.json())) as Category
 
   core.info(`📃 Attempting to parse titleRegex '${input.titleRegex}'`)
   const titleRegex = new RegExp(input.titleRegex)
@@ -208,13 +253,24 @@ export async function processRequest(input: Request): Promise<void> {
     try {
       if (input.create === True) {
         core.info(`📃 Attempting to create '${file}' as a document...`)
-        await sdk.createDoc({
-          ...baseRequest,
-          title: fileTitle,
-          slug: path.basename(file, path.extname(file)).trim(),
-          category: category._id,
-          body: fileContents,
-          'x-readme-version': input.version
+        await fetch('https://dash.readme.com/api/v1/docs', {
+          ...options,
+          method: 'POST',
+          headers: {...options.headers, 'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            ...baseRequest,
+            title: fileTitle,
+            slug: path.basename(file, path.extname(file)).trim(),
+            category: category._id,
+            body: fileContents
+          })
+        }).then(async res => {
+          if (!res.ok) {
+            const body = await res.text()
+            throw new Error(`${res.status}: ${body}`)
+          } else {
+            return res
+          }
         })
       } else {
         // throw an empty error to enter the catch clause and attempt update
@@ -227,13 +283,28 @@ export async function processRequest(input: Request): Promise<void> {
 
       if (input.overwrite === True) {
         core.info(`📃 Attempting to update '${file}' document...`)
-        await sdk.updateDoc({
-          ...baseRequest,
-          title: fileTitle,
-          slug: path.basename(file, path.extname(file)).trim(),
-          category: category._id,
-          body: fileContents,
-          'x-readme-version': input.version
+        await fetch(
+          `https://dash.readme.com/api/v1/docs/${path
+            .basename(file, path.extname(file))
+            .trim()}`,
+          {
+            ...options,
+            method: 'PUT',
+            headers: {...options.headers, 'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              ...baseRequest,
+              title: fileTitle,
+              category: category._id,
+              body: fileContents
+            })
+          }
+        ).then(async res => {
+          if (!res.ok) {
+            const body = await res.text()
+            throw new Error(`${res.status}: ${body}`)
+          } else {
+            return res
+          }
         })
       } else {
         // rethrow
