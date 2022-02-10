@@ -285,9 +285,9 @@ function run() {
             // check the inputs
             // this assumes that non-required action.yml inputs have default values
             for (const paramId in paramNames) {
-                if (!inputs[paramId] ||
-                    (inputs[paramId].length === 0 &&
-                        !allowedEmptyParams.includes(paramId))) {
+                if ((!inputs[paramId] ||
+                    inputs[paramId].length === 0) &&
+                    !allowedEmptyParams.includes(paramId)) {
                     throw new InputMissingError(paramId);
                 }
             }

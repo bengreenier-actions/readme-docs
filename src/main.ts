@@ -44,9 +44,9 @@ async function run(): Promise<void> {
     // this assumes that non-required action.yml inputs have default values
     for (const paramId in paramNames) {
       if (
-        !inputs[paramId as RequestKey] ||
-        (inputs[paramId as RequestKey].length === 0 &&
-          !allowedEmptyParams.includes(paramId as RequestKey))
+        (!inputs[paramId as RequestKey] ||
+          inputs[paramId as RequestKey].length === 0) &&
+        !allowedEmptyParams.includes(paramId as RequestKey)
       ) {
         throw new InputMissingError(paramId)
       }
