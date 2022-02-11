@@ -158,10 +158,36 @@ function processRequest(input) {
                 throw new Error(`❌  Unable to find title for file '${file}' using regex '${input.titleRegex}'.`);
             }
             const fileTitle = fileTileMatches[1].trim();
+            const slug = path_1.default
+                .basename(file, path_1.default.extname(file))
+                .trim()
+                .toLowerCase()
+                .replace(/--/g, '-');
             try {
-                if (input.create === True) {
+                let shouldAttemptCreate = !(input.create === True && input.overwrite === True);
+                try {
+                    // if overwrite and create are true we need to check
+                    // this is because readme-com api doesn't fail if a slug already exists
+                    if (input.create === True && input.overwrite === True) {
+                        yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign({}, options)).then((res) => __awaiter(this, void 0, void 0, function* () {
+                            if (!res.ok) {
+                                const body = yield res.text();
+                                throw new Error(`${res.status}: ${body}`);
+                            }
+                            else {
+                                return res;
+                            }
+                        }));
+                    }
+                    core.info(`📃 Found slug, skipping creation...`);
+                }
+                catch (e) {
+                    core.info(`📃 Did not find ${slug}, proceeding with creation...`);
+                    shouldAttemptCreate = true;
+                }
+                if (input.create === True && shouldAttemptCreate) {
                     core.info(`📃 Attempting to create '${file}' as a document...`);
-                    yield (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, slug: path_1.default.basename(file, path_1.default.extname(file)).trim(), category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                    yield (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, slug, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);
@@ -182,9 +208,7 @@ function processRequest(input) {
                 }
                 if (input.overwrite === True) {
                     core.info(`📃 Attempting to update '${file}' document...`);
-                    yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${path_1.default
-                        .basename(file, path_1.default.extname(file))
-                        .trim()}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                    yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);

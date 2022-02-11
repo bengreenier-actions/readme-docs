@@ -282,9 +282,40 @@ export async function processRequest(input: Request): Promise<void> {
     }
 
     const fileTitle = fileTileMatches[1].trim()
+    const slug = path
+      .basename(file, path.extname(file))
+      .trim()
+      .toLowerCase()
+      .replace(/--/g, '-')
 
     try {
-      if (input.create === True) {
+      let shouldAttemptCreate = !(
+        input.create === True && input.overwrite === True
+      )
+
+      try {
+        // if overwrite and create are true we need to check
+        // this is because readme-com api doesn't fail if a slug already exists
+        if (input.create === True && input.overwrite === True) {
+          await fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
+            ...options
+          }).then(async res => {
+            if (!res.ok) {
+              const body = await res.text()
+              throw new Error(`${res.status}: ${body}`)
+            } else {
+              return res
+            }
+          })
+        }
+
+        core.info(`📃 Found slug, skipping creation...`)
+      } catch (e) {
+        core.info(`📃 Did not find ${slug}, proceeding with creation...`)
+        shouldAttemptCreate = true
+      }
+
+      if (input.create === True && shouldAttemptCreate) {
         core.info(`📃 Attempting to create '${file}' as a document...`)
         await fetch('https://dash.readme.com/api/v1/docs', {
           ...options,
@@ -293,7 +324,7 @@ export async function processRequest(input: Request): Promise<void> {
           body: JSON.stringify({
             ...baseRequest,
             title: `${titlePrefix}${fileTitle}`,
-            slug: path.basename(file, path.extname(file)).trim(),
+            slug,
             category: category._id,
             body: fileContents
           })
@@ -316,22 +347,17 @@ export async function processRequest(input: Request): Promise<void> {
 
       if (input.overwrite === True) {
         core.info(`📃 Attempting to update '${file}' document...`)
-        await fetch(
-          `https://dash.readme.com/api/v1/docs/${path
-            .basename(file, path.extname(file))
-            .trim()}`,
-          {
-            ...options,
-            method: 'PUT',
-            headers: {...options.headers, 'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              ...baseRequest,
-              title: `${titlePrefix}${fileTitle}`,
-              category: category._id,
-              body: fileContents
-            })
-          }
-        ).then(async res => {
+        await fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
+          ...options,
+          method: 'PUT',
+          headers: {...options.headers, 'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            ...baseRequest,
+            title: `${titlePrefix}${fileTitle}`,
+            category: category._id,
+            body: fileContents
+          })
+        }).then(async res => {
           if (!res.ok) {
             const body = await res.text()
             throw new Error(`${res.status}: ${body}`)
