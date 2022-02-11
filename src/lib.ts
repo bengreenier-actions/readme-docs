@@ -259,7 +259,7 @@ export async function processRequest(input: Request): Promise<void> {
 
   core.info(`📃 Attempting to parse titleRegex '${input.titleRegex}'`)
   const titleRegex = new RegExp(input.titleRegex)
-  const titlePrefix = input.titlePrefix ?? ''
+  const titlePrefix = `${input.titlePrefix} ` ?? ''
 
   core.info(`📃 Attempting to parse additionalJson '${input.additionalJson}'`)
 

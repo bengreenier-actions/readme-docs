@@ -144,7 +144,7 @@ function processRequest(input) {
             .then((res) => __awaiter(this, void 0, void 0, function* () { return yield res.json(); })));
         core.info(`📃 Attempting to parse titleRegex '${input.titleRegex}'`);
         const titleRegex = new RegExp(input.titleRegex);
-        const titlePrefix = (_a = input.titlePrefix) !== null && _a !== void 0 ? _a : '';
+        const titlePrefix = (_a = `${input.titlePrefix} `) !== null && _a !== void 0 ? _a : '';
         core.info(`📃 Attempting to parse additionalJson '${input.additionalJson}'`);
         const baseRequest = parentDocId
             ? Object.assign(Object.assign({}, JSON.parse(input.additionalJson)), { parentDoc: parentDocId }) : JSON.parse(input.additionalJson);
