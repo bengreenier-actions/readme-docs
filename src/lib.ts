@@ -2,10 +2,10 @@
 import 'global-agent/bootstrap'
 import * as core from '@actions/core'
 import * as glob from '@actions/glob'
+import {Policy} from 'cockatiel'
 import fetch from 'node-fetch-cjs'
 import fs from 'fs'
 import path from 'path'
-
 export interface SlimDoc {
   title: string
   _id: string
@@ -183,17 +183,23 @@ export async function processRequest(input: Request): Promise<void> {
 
     await Promise.all(
       childDocs.map(async d =>
-        fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
-          ...options,
-          method: 'DELETE'
-        }).then(async res => {
-          if (!res.ok) {
-            const body = await res.text()
-            throw new Error(`${res.status}: ${body}`)
-          } else {
-            return res
-          }
-        })
+        Policy.handleAll()
+          .retry()
+          .attempts(5)
+          .exponential()
+          .execute(async () =>
+            fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
+              ...options,
+              method: 'DELETE'
+            }).then(async res => {
+              if (!res.ok) {
+                const body = await res.text()
+                throw new Error(`${res.status}: ${body}`)
+              } else {
+                return res
+              }
+            })
+          )
       )
     )
 
@@ -202,17 +208,23 @@ export async function processRequest(input: Request): Promise<void> {
     if (!input.parentSlug || input.parentSlug.length === 0) {
       await Promise.all(
         docs.map(async d =>
-          fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
-            ...options,
-            method: 'DELETE'
-          }).then(async res => {
-            if (!res.ok) {
-              const body = await res.text()
-              throw new Error(`${res.status}: ${body}`)
-            } else {
-              return res
-            }
-          })
+          Policy.handleAll()
+            .retry()
+            .attempts(5)
+            .exponential()
+            .execute(async () =>
+              fetch(`https://dash.readme.com/api/v1/docs/${d.slug}`, {
+                ...options,
+                method: 'DELETE'
+              }).then(async res => {
+                if (!res.ok) {
+                  const body = await res.text()
+                  throw new Error(`${res.status}: ${body}`)
+                } else {
+                  return res
+                }
+              })
+            )
         )
       )
 
@@ -297,16 +309,23 @@ export async function processRequest(input: Request): Promise<void> {
         // if overwrite and create are true we need to check
         // this is because readme-com api doesn't fail if a slug already exists
         if (input.create === True && input.overwrite === True) {
-          await fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
-            ...options
-          }).then(async res => {
-            if (!res.ok) {
-              const body = await res.text()
-              throw new Error(`${res.status}: ${body}`)
-            } else {
-              return res
-            }
-          })
+          await Policy.handleAll()
+            .retry()
+            .attempts(5)
+            .exponential()
+            .execute(async () =>
+              fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
+                ...options
+              })
+            )
+            .then(async res => {
+              if (!res.ok) {
+                const body = await res.text()
+                throw new Error(`${res.status}: ${body}`)
+              } else {
+                return res
+              }
+            })
         }
 
         core.info(`📃 Found slug, skipping creation...`)
@@ -317,25 +336,32 @@ export async function processRequest(input: Request): Promise<void> {
 
       if (input.create === True && shouldAttemptCreate) {
         core.info(`📃 Attempting to create '${file}' as a document...`)
-        await fetch('https://dash.readme.com/api/v1/docs', {
-          ...options,
-          method: 'POST',
-          headers: {...options.headers, 'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            ...baseRequest,
-            title: `${titlePrefix}${fileTitle}`,
-            slug,
-            category: category._id,
-            body: fileContents
+        await Policy.handleAll()
+          .retry()
+          .attempts(5)
+          .exponential()
+          .execute(async () =>
+            fetch('https://dash.readme.com/api/v1/docs', {
+              ...options,
+              method: 'POST',
+              headers: {...options.headers, 'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                ...baseRequest,
+                title: `${titlePrefix}${fileTitle}`,
+                slug,
+                category: category._id,
+                body: fileContents
+              })
+            })
+          )
+          .then(async res => {
+            if (!res.ok) {
+              const body = await res.text()
+              throw new Error(`${res.status}: ${body}`)
+            } else {
+              return res
+            }
           })
-        }).then(async res => {
-          if (!res.ok) {
-            const body = await res.text()
-            throw new Error(`${res.status}: ${body}`)
-          } else {
-            return res
-          }
-        })
       } else {
         // throw an empty error to enter the catch clause and attempt update
         throw new Error()
@@ -347,24 +373,31 @@ export async function processRequest(input: Request): Promise<void> {
 
       if (input.overwrite === True) {
         core.info(`📃 Attempting to update '${file}' document...`)
-        await fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
-          ...options,
-          method: 'PUT',
-          headers: {...options.headers, 'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            ...baseRequest,
-            title: `${titlePrefix}${fileTitle}`,
-            category: category._id,
-            body: fileContents
+        await Policy.handleAll()
+          .retry()
+          .attempts(5)
+          .exponential()
+          .execute(async () =>
+            fetch(`https://dash.readme.com/api/v1/docs/${slug}`, {
+              ...options,
+              method: 'PUT',
+              headers: {...options.headers, 'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                ...baseRequest,
+                title: `${titlePrefix}${fileTitle}`,
+                category: category._id,
+                body: fileContents
+              })
+            })
+          )
+          .then(async res => {
+            if (!res.ok) {
+              const body = await res.text()
+              throw new Error(`${res.status}: ${body}`)
+            } else {
+              return res
+            }
           })
-        }).then(async res => {
-          if (!res.ok) {
-            const body = await res.text()
-            throw new Error(`${res.status}: ${body}`)
-          } else {
-            return res
-          }
-        })
       } else if (input.create !== True) {
         // swallow
         core.warning(

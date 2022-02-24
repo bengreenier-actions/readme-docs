@@ -43,6 +43,7 @@ exports.processRequest = void 0;
 __nccwpck_require__(5687);
 const core = __importStar(__nccwpck_require__(2186));
 const glob = __importStar(__nccwpck_require__(8090));
+const cockatiel_1 = __nccwpck_require__(5826);
 const node_fetch_cjs_1 = __importDefault(__nccwpck_require__(563));
 const fs_1 = __importDefault(__nccwpck_require__(5747));
 const path_1 = __importDefault(__nccwpck_require__(5622));
@@ -89,19 +90,11 @@ function processRequest(input) {
                 core.info(`Attempting '${input.categorySlug}' clear...`);
             }
             yield Promise.all(childDocs.map((d) => __awaiter(this, void 0, void 0, function* () {
-                return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
-                    if (!res.ok) {
-                        const body = yield res.text();
-                        throw new Error(`${res.status}: ${body}`);
-                    }
-                    else {
-                        return res;
-                    }
-                }));
-            })));
-            core.info(`📃 Children destroyed`);
-            if (!input.parentSlug || input.parentSlug.length === 0) {
-                yield Promise.all(docs.map((d) => __awaiter(this, void 0, void 0, function* () {
+                return cockatiel_1.Policy.handleAll()
+                    .retry()
+                    .attempts(5)
+                    .exponential()
+                    .execute(() => __awaiter(this, void 0, void 0, function* () {
                     return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
@@ -110,6 +103,26 @@ function processRequest(input) {
                         else {
                             return res;
                         }
+                    }));
+                }));
+            })));
+            core.info(`📃 Children destroyed`);
+            if (!input.parentSlug || input.parentSlug.length === 0) {
+                yield Promise.all(docs.map((d) => __awaiter(this, void 0, void 0, function* () {
+                    return cockatiel_1.Policy.handleAll()
+                        .retry()
+                        .attempts(5)
+                        .exponential()
+                        .execute(() => __awaiter(this, void 0, void 0, function* () {
+                        return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${d.slug}`, Object.assign(Object.assign({}, options), { method: 'DELETE' })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                            if (!res.ok) {
+                                const body = yield res.text();
+                                throw new Error(`${res.status}: ${body}`);
+                            }
+                            else {
+                                return res;
+                            }
+                        }));
                     }));
                 })));
                 core.info(`📃 Parents destroyed`);
@@ -169,7 +182,14 @@ function processRequest(input) {
                     // if overwrite and create are true we need to check
                     // this is because readme-com api doesn't fail if a slug already exists
                     if (input.create === True && input.overwrite === True) {
-                        yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign({}, options)).then((res) => __awaiter(this, void 0, void 0, function* () {
+                        yield cockatiel_1.Policy.handleAll()
+                            .retry()
+                            .attempts(5)
+                            .exponential()
+                            .execute(() => __awaiter(this, void 0, void 0, function* () {
+                            return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign({}, options));
+                        }))
+                            .then((res) => __awaiter(this, void 0, void 0, function* () {
                             if (!res.ok) {
                                 const body = yield res.text();
                                 throw new Error(`${res.status}: ${body}`);
@@ -187,7 +207,14 @@ function processRequest(input) {
                 }
                 if (input.create === True && shouldAttemptCreate) {
                     core.info(`📃 Attempting to create '${file}' as a document...`);
-                    yield (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, slug, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                    yield cockatiel_1.Policy.handleAll()
+                        .retry()
+                        .attempts(5)
+                        .exponential()
+                        .execute(() => __awaiter(this, void 0, void 0, function* () {
+                        return (0, node_fetch_cjs_1.default)('https://dash.readme.com/api/v1/docs', Object.assign(Object.assign({}, options), { method: 'POST', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, slug, category: category._id, body: fileContents })) }));
+                    }))
+                        .then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);
@@ -208,7 +235,14 @@ function processRequest(input) {
                 }
                 if (input.overwrite === True) {
                     core.info(`📃 Attempting to update '${file}' document...`);
-                    yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, category: category._id, body: fileContents })) })).then((res) => __awaiter(this, void 0, void 0, function* () {
+                    yield cockatiel_1.Policy.handleAll()
+                        .retry()
+                        .attempts(5)
+                        .exponential()
+                        .execute(() => __awaiter(this, void 0, void 0, function* () {
+                        return (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/docs/${slug}`, Object.assign(Object.assign({}, options), { method: 'PUT', headers: Object.assign(Object.assign({}, options.headers), { 'Content-Type': 'application/json' }), body: JSON.stringify(Object.assign(Object.assign({}, baseRequest), { title: `${titlePrefix}${fileTitle}`, category: category._id, body: fileContents })) }));
+                    }))
+                        .then((res) => __awaiter(this, void 0, void 0, function* () {
                         if (!res.ok) {
                             const body = yield res.text();
                             throw new Error(`${res.status}: ${body}`);
@@ -3104,6 +3138,1839 @@ function expand(str, isTop) {
 }
 
 
+
+/***/ }),
+
+/***/ 2791:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.BulkheadPolicy = void 0;
+const abort_1 = __nccwpck_require__(3296);
+const defer_1 = __nccwpck_require__(2957);
+const Event_1 = __nccwpck_require__(3091);
+const Executor_1 = __nccwpck_require__(5504);
+const BulkheadRejectedError_1 = __nccwpck_require__(3212);
+const Errors_1 = __nccwpck_require__(2266);
+/**
+ * Bulkhead limits concurrent requests made.
+ */
+class BulkheadPolicy {
+    constructor(capacity, queueCapacity) {
+        this.capacity = capacity;
+        this.queueCapacity = queueCapacity;
+        this.active = 0;
+        this.queue = [];
+        this.onRejectEmitter = new Event_1.EventEmitter();
+        this.executor = new Executor_1.ExecuteWrapper();
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+        /**
+         * Emitter that fires when an item is rejected from the bulkhead.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onReject = this.onRejectEmitter.addListener;
+    }
+    /**
+     * Returns the number of available execution slots at this point in time.
+     */
+    get executionSlots() {
+        return this.capacity - this.active;
+    }
+    /**
+     * Returns the number of queue slots at this point in time.
+     */
+    get queueSlots() {
+        return this.queueCapacity - this.queue.length;
+    }
+    /**
+     * Executes the given function.
+     * @param fn Function to execute
+     * @throws a {@link BulkheadRejectedException} if the bulkhead limits are exceeeded
+     */
+    async execute(fn, signal = abort_1.neverAbortedSignal) {
+        if (signal.aborted) {
+            throw new Errors_1.TaskCancelledError();
+        }
+        if (this.active < this.capacity) {
+            this.active++;
+            try {
+                return await fn({ signal });
+            }
+            finally {
+                this.active--;
+                this.dequeue();
+            }
+        }
+        if (this.queue.length < this.queueCapacity) {
+            const { resolve, reject, promise } = (0, defer_1.defer)();
+            this.queue.push({ signal, fn, resolve, reject });
+            return promise;
+        }
+        this.onRejectEmitter.emit();
+        throw new BulkheadRejectedError_1.BulkheadRejectedError(this.capacity, this.queueCapacity);
+    }
+    dequeue() {
+        const item = this.queue.shift();
+        if (!item) {
+            return;
+        }
+        Promise.resolve()
+            .then(() => this.execute(item.fn, item.signal))
+            .then(item.resolve)
+            .catch(item.reject);
+    }
+}
+exports.BulkheadPolicy = BulkheadPolicy;
+//# sourceMappingURL=BulkheadPolicy.js.map
+
+/***/ }),
+
+/***/ 8234:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.CircuitBreakerPolicy = exports.CircuitState = void 0;
+const abort_1 = __nccwpck_require__(3296);
+const Event_1 = __nccwpck_require__(3091);
+const Executor_1 = __nccwpck_require__(5504);
+const Errors_1 = __nccwpck_require__(2266);
+const IsolatedCircuitError_1 = __nccwpck_require__(5298);
+var CircuitState;
+(function (CircuitState) {
+    /**
+     * Normal operation. Execution of actions allowed.
+     */
+    CircuitState[CircuitState["Closed"] = 0] = "Closed";
+    /**
+     * The automated controller has opened the circuit. Execution of actions blocked.
+     */
+    CircuitState[CircuitState["Open"] = 1] = "Open";
+    /**
+     * Recovering from open state, after the automated break duration has
+     * expired. Execution of actions permitted. Success of subsequent action/s
+     * controls onward transition to Open or Closed state.
+     */
+    CircuitState[CircuitState["HalfOpen"] = 2] = "HalfOpen";
+    /**
+     * Circuit held manually in an open state. Execution of actions blocked.
+     */
+    CircuitState[CircuitState["Isolated"] = 3] = "Isolated";
+})(CircuitState = exports.CircuitState || (exports.CircuitState = {}));
+class CircuitBreakerPolicy {
+    constructor(options, executor) {
+        this.options = options;
+        this.executor = executor;
+        this.breakEmitter = new Event_1.EventEmitter();
+        this.resetEmitter = new Event_1.EventEmitter();
+        this.halfOpenEmitter = new Event_1.EventEmitter();
+        this.stateChangeEmitter = new Event_1.EventEmitter();
+        this.innerState = { value: CircuitState.Closed };
+        /**
+         * Event emitted when the circuit breaker opens.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onBreak = this.breakEmitter.addListener;
+        /**
+         * Event emitted when the circuit breaker resets.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onReset = this.resetEmitter.addListener;
+        /**
+         * Event emitted when the circuit breaker is half open (running a test call).
+         * Either `onBreak` on `onReset` will subsequently fire.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onHalfOpen = this.halfOpenEmitter.addListener;
+        /**
+         * Fired whenever the circuit breaker state changes.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onStateChange = this.stateChangeEmitter.addListener;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+    }
+    /**
+     * Gets the current circuit breaker state.
+     */
+    get state() {
+        return this.innerState.value;
+    }
+    /**
+     * Gets the last reason the circuit breaker failed.
+     */
+    get lastFailure() {
+        return this.innerLastFailure;
+    }
+    /**
+     * Manually holds open the circuit breaker.
+     * @returns A handle that keeps the breaker open until `.dispose()` is called.
+     */
+    isolate() {
+        if (this.innerState.value !== CircuitState.Isolated) {
+            this.innerState = { value: CircuitState.Isolated, counters: 0 };
+            this.breakEmitter.emit({ isolated: true });
+            this.stateChangeEmitter.emit(CircuitState.Isolated);
+        }
+        this.innerState.counters++;
+        let disposed = false;
+        return {
+            dispose: () => {
+                if (disposed) {
+                    return;
+                }
+                disposed = true;
+                if (this.innerState.value === CircuitState.Isolated && !--this.innerState.counters) {
+                    this.innerState = { value: CircuitState.Closed };
+                    this.resetEmitter.emit();
+                    this.stateChangeEmitter.emit(CircuitState.Closed);
+                }
+            },
+        };
+    }
+    /**
+     * Executes the given function.
+     * @param fn Function to run
+     * @throws a {@link BrokenCircuitError} if the circuit is open
+     * @throws a {@link IsolatedCircuitError} if the circuit is held
+     * open via {@link CircuitBreakerPolicy.isolate}
+     * @returns a Promise that resolves or rejects with the function results.
+     */
+    async execute(fn, signal = abort_1.neverAbortedSignal) {
+        const state = this.innerState;
+        switch (state.value) {
+            case CircuitState.Closed:
+                const result = await this.executor.invoke(fn, { signal });
+                if ('success' in result) {
+                    this.options.breaker.success(state.value);
+                }
+                else {
+                    this.innerLastFailure = result;
+                    if (this.options.breaker.failure(state.value)) {
+                        this.open(result);
+                    }
+                }
+                return (0, Executor_1.returnOrThrow)(result);
+            case CircuitState.HalfOpen:
+                await state.test.catch(() => undefined);
+                if (this.state === CircuitState.Closed && signal.aborted) {
+                    throw new Errors_1.TaskCancelledError();
+                }
+                return this.execute(fn);
+            case CircuitState.Open:
+                if (Date.now() - state.openedAt < this.options.halfOpenAfter) {
+                    throw new Errors_1.BrokenCircuitError();
+                }
+                const test = this.halfOpen(fn, signal);
+                this.innerState = { value: CircuitState.HalfOpen, test };
+                this.stateChangeEmitter.emit(CircuitState.HalfOpen);
+                return test;
+            case CircuitState.Isolated:
+                throw new IsolatedCircuitError_1.IsolatedCircuitError();
+            default:
+                throw new Error(`Unexpected circuit state ${state}`);
+        }
+    }
+    async halfOpen(fn, signal) {
+        this.halfOpenEmitter.emit();
+        try {
+            const result = await this.executor.invoke(fn, { signal });
+            if ('success' in result) {
+                this.options.breaker.success(CircuitState.HalfOpen);
+                this.close();
+            }
+            else {
+                this.innerLastFailure = result;
+                this.options.breaker.failure(CircuitState.HalfOpen);
+                this.open(result);
+            }
+            return (0, Executor_1.returnOrThrow)(result);
+        }
+        catch (err) {
+            // It's an error, but not one the circuit is meant to retry, so
+            // for our purposes it's a success. Task failed successfully!
+            this.close();
+            throw err;
+        }
+    }
+    open(reason) {
+        if (this.state === CircuitState.Isolated || this.state === CircuitState.Open) {
+            return;
+        }
+        this.innerState = { value: CircuitState.Open, openedAt: Date.now() };
+        this.breakEmitter.emit(reason);
+        this.stateChangeEmitter.emit(CircuitState.Open);
+    }
+    close() {
+        if (this.state === CircuitState.HalfOpen) {
+            this.innerState = { value: CircuitState.Closed };
+            this.resetEmitter.emit();
+            this.stateChangeEmitter.emit(CircuitState.Closed);
+        }
+    }
+}
+exports.CircuitBreakerPolicy = CircuitBreakerPolicy;
+//# sourceMappingURL=CircuitBreakerPolicy.js.map
+
+/***/ }),
+
+/***/ 4629:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.FallbackPolicy = void 0;
+const abort_1 = __nccwpck_require__(3296);
+class FallbackPolicy {
+    constructor(executor, value) {
+        this.executor = executor;
+        this.value = value;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+    }
+    /**
+     * Executes the given function.
+     * @param fn Function to execute.
+     * @returns The function result or fallback value.
+     */
+    async execute(fn, signal = abort_1.neverAbortedSignal) {
+        const result = await this.executor.invoke(fn, { signal });
+        if ('success' in result) {
+            return result.success;
+        }
+        return this.value();
+    }
+}
+exports.FallbackPolicy = FallbackPolicy;
+//# sourceMappingURL=FallbackPolicy.js.map
+
+/***/ }),
+
+/***/ 5498:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.NoopPolicy = void 0;
+const abort_1 = __nccwpck_require__(3296);
+const Executor_1 = __nccwpck_require__(5504);
+/**
+ * A no-op policy, useful for unit tests and stubs.
+ */
+class NoopPolicy {
+    constructor() {
+        this.executor = new Executor_1.ExecuteWrapper();
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+    }
+    async execute(fn, signal = abort_1.neverAbortedSignal) {
+        return (0, Executor_1.returnOrThrow)(await this.executor.invoke(fn, { signal }));
+    }
+}
+exports.NoopPolicy = NoopPolicy;
+//# sourceMappingURL=NoopPolicy.js.map
+
+/***/ }),
+
+/***/ 3202:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Policy = void 0;
+const BulkheadPolicy_1 = __nccwpck_require__(2791);
+const CircuitBreakerPolicy_1 = __nccwpck_require__(8234);
+const Executor_1 = __nccwpck_require__(5504);
+const FallbackPolicy_1 = __nccwpck_require__(4629);
+const NoopPolicy_1 = __nccwpck_require__(5498);
+const RetryPolicy_1 = __nccwpck_require__(4797);
+const TimeoutPolicy_1 = __nccwpck_require__(8965);
+const typeFilter = (cls, predicate) => predicate ? (v) => v instanceof cls && predicate(v) : (v) => v instanceof cls;
+const always = () => true;
+const never = () => false;
+/**
+ * Factory that builds a base set of filters that can be used in circuit
+ * breakers, retries, etc.
+ */
+class Policy {
+    constructor(options) {
+        this.options = options;
+    }
+    static wrap(...p) {
+        return {
+            onFailure: p[0].onFailure,
+            onSuccess: p[0].onSuccess,
+            execute(fn, signal) {
+                const run = (context, i) => i === p.length
+                    ? fn(context)
+                    : p[i].execute(next => run({ ...context, ...next }, i + 1), context.signal);
+                return Promise.resolve(run({ signal }, 0));
+            },
+        };
+    }
+    /**
+     * Creates a bulkhead--a policy that limits the number of concurrent calls.
+     */
+    static bulkhead(limit, queue = 0) {
+        return new BulkheadPolicy_1.BulkheadPolicy(limit, queue);
+    }
+    /**
+     * Creates a retry policy that handles all errors.
+     */
+    static handleAll() {
+        return new Policy({ errorFilter: always, resultFilter: never });
+    }
+    /**
+     * See {@link Policy.orType} for usage.
+     */
+    static handleType(cls, predicate) {
+        return new Policy({ errorFilter: typeFilter(cls, predicate), resultFilter: never });
+    }
+    /**
+     * See {@link Policy.orWhen} for usage.
+     */
+    static handleWhen(predicate) {
+        return new Policy({ errorFilter: predicate, resultFilter: never });
+    }
+    /**
+     * See {@link Policy.orResultType} for usage.
+     */
+    static handleResultType(cls, predicate) {
+        return new Policy({ errorFilter: never, resultFilter: typeFilter(cls, predicate) });
+    }
+    /**
+     * See {@link Policy.orWhenResult} for usage.
+     */
+    static handleWhenResult(predicate) {
+        return new Policy({ errorFilter: never, resultFilter: predicate });
+    }
+    /**
+     * Creates a timeout policy.
+     * @param duration - How long to wait before timing out execute()'d functions
+     * @param strategy - Strategy for timeouts, "Cooperative" or "Aggressive".
+     * A {@link CancellationToken} will be pass to any executed function, and in
+     * cooperative timeouts we'll simply wait for that function to return or
+     * throw. In aggressive timeouts, we'll immediately throw a
+     * {@link TaskCancelledError} when the timeout is reached, in addition to
+     * marking the passed token as failed.
+     */
+    static timeout(duration, strategy) {
+        return new TimeoutPolicy_1.TimeoutPolicy(duration, strategy);
+    }
+    /**
+     * A decorator that can be used to wrap class methods and apply the given
+     * policy to them. It also adds the last argument normally given in
+     * {@link Policy.execute} as the last argument in the function call.
+     * For example:
+     *
+     * ```ts
+     * import { Policy } from 'cockatiel';
+     *
+     * const retry = Policy.handleAll().retry().attempts(3);
+     *
+     * class Database {
+     *   @Policy.use(retry)
+     *   public getUserInfo(userId, context, cancellationToken) {
+     *     console.log('Retry attempt number', context.attempt);
+     *     // implementation here
+     *   }
+     * }
+     *
+     * const db = new Database();
+     * db.getUserInfo(3).then(info => console.log('User 3 info:', info))
+     * ```
+     *
+     * Note that it will force the return type to be a Promise, since that's
+     * what policies return.
+     */
+    static use(policy) {
+        // tslint:disable-next-line: variable-name
+        return (_target, _key, descriptor) => {
+            const inner = descriptor.value;
+            if (typeof inner !== 'function') {
+                throw new Error(`Can only decorate functions with @cockatiel, got ${typeof inner}`);
+            }
+            descriptor.value = function (...args) {
+                const signal = args[args.length - 1] instanceof AbortSignal ? args.pop() : undefined;
+                return policy.execute(context => inner.apply(this, [...args, context]), signal);
+            };
+        };
+    }
+    /**
+     * Allows the policy to additionally handles errors of the given type.
+     *
+     * @param cls Class constructor to check that the error is an instance of.
+     * @param predicate If provided, a function to be called with the error
+     * which should return "true" if we want to handle this error.
+     * @example
+     * ```js
+     * // retry both network errors and response errors with a 503 status code
+     * new Policy()
+     *  .orType(NetworkError)
+     *  .orType(ResponseError, err => err.statusCode === 503)
+     *  .retry()
+     *  .attempts(3)
+     *  .execute(() => getJsonFrom('https://example.com'));
+     * ```
+     */
+    orType(cls, predicate) {
+        const filter = typeFilter(cls, predicate);
+        return new Policy({
+            ...this.options,
+            errorFilter: e => this.options.errorFilter(e) || filter(e),
+        });
+    }
+    /**
+     * Allows the policy to additionally handles errors that pass the given
+     * predicate function.
+     *
+     * @param predicate Takes any thrown error, and returns true if it should
+     * be retried by this policy.
+     * @example
+     * ```js
+     * // only retry if the error has a "shouldBeRetried" property set
+     * new Policy()
+     *  .orWhen(err => err.shouldBeRetried === true)
+     *  .retry()
+     *  .attempts(3)
+     *  .execute(() => getJsonFrom('https://example.com'));
+     * ```
+     */
+    orWhen(predicate) {
+        return new Policy({
+            ...this.options,
+            errorFilter: e => this.options.errorFilter(e) || predicate(e),
+        });
+    }
+    /**
+     * Adds handling for return values. The predicate will be called with
+     * the return value of the executed function,
+     *
+     * @param predicate Takes the returned value, and returns true if it
+     * should be retried by this policy.
+     * @example
+     * ```js
+     * // retry when the response status code is a 5xx
+     * new Policy()
+     *  .orResultWhen(res => res.statusCode >= 500)
+     *  .retry()
+     *  .attempts(3)
+     *  .execute(() => getJsonFrom('https://example.com'));
+     * ```
+     */
+    orWhenResult(predicate) {
+        return new Policy({
+            ...this.options,
+            resultFilter: r => this.options.resultFilter(r) || predicate(r),
+        });
+    }
+    /**
+     * Adds handling for return values. The predicate will be called with
+     * the return value of the executed function,
+     *
+     * @param predicate Takes the returned value, and returns true if it
+     * should be retried by this policy.
+     * @example
+     * ```js
+     * // retry when the response status code is a 5xx
+     * new Policy()
+     *  .orResultType(res => res.statusCode >= 500)
+     *  .retry()
+     *  .attempts(3)
+     *  .execute(() => getJsonFrom('https://example.com'));
+     * ```
+     */
+    orResultType(cls, predicate) {
+        const filter = typeFilter(cls, predicate);
+        return new Policy({
+            ...this.options,
+            resultFilter: r => this.options.resultFilter(r) || filter(r),
+        });
+    }
+    /**
+     * Returns a retry policy builder.
+     */
+    retry() {
+        return new RetryPolicy_1.RetryPolicy({}, new Executor_1.ExecuteWrapper(this.options.errorFilter, this.options.resultFilter));
+    }
+    /**
+     * Returns a circuit breaker for the policy. **Important**: you should share
+     * your circuit breaker between executions of whatever function you're
+     * wrapping for it to function!
+     *
+     * ```ts
+     * import { SamplingBreaker, Policy } from 'cockatiel';
+     *
+     * // Break if more than 20% of requests fail in a 30 second time window:
+     * const breaker = Policy
+     *  .handleAll()
+     *  .circuitBreaker(10_000, new SamplingBreaker(0.2, 30 * 1000));
+     *
+     * export function handleRequest() {
+     *   return breaker.execute(() => getInfoFromDatabase());
+     * }
+     * ```
+     *
+     * @param halfOpenAfter Time after failures to try to open the circuit
+     * breaker again.
+     * @param breaker The circuit breaker to use. This package exports
+     * ConsecutiveBreaker and SamplingBreakers for you to use.
+     */
+    circuitBreaker(halfOpenAfter, breaker) {
+        return new CircuitBreakerPolicy_1.CircuitBreakerPolicy({
+            breaker,
+            halfOpenAfter,
+        }, new Executor_1.ExecuteWrapper(this.options.errorFilter, this.options.resultFilter));
+    }
+    /**
+     * Falls back to the given value in the event of an error.
+     *
+     * ```ts
+     * import { Policy } from 'cockatiel';
+     *
+     * const fallback = Policy
+     *  .handleType(DatabaseError)
+     *  .fallback(() => getStaleData());
+     *
+     * export function handleRequest() {
+     *   return fallback.execute(() => getInfoFromDatabase());
+     * }
+     * ```
+     *
+     * @param toValue Value to fall back to, or a function that creates the
+     * value to return (any may return a promise)
+     */
+    fallback(valueOrFactory) {
+        return new FallbackPolicy_1.FallbackPolicy(new Executor_1.ExecuteWrapper(this.options.errorFilter, this.options.resultFilter), 
+        // not technically type-safe, since if they actually want to _return_
+        // a function, that gets lost here. We'll just advice in the docs to
+        // use a higher-order function if necessary.
+        (typeof valueOrFactory === 'function' ? valueOrFactory : () => valueOrFactory));
+    }
+}
+exports.Policy = Policy;
+/**
+ * A no-op policy, useful for unit tests and stubs.
+ */
+Policy.noop = new NoopPolicy_1.NoopPolicy();
+//# sourceMappingURL=Policy.js.map
+
+/***/ }),
+
+/***/ 4797:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RetryPolicy = void 0;
+const Backoff_1 = __nccwpck_require__(812);
+const CompositeBackoff_1 = __nccwpck_require__(9283);
+const ConstantBackoff_1 = __nccwpck_require__(4130);
+const DelegateBackoff_1 = __nccwpck_require__(6139);
+const IterableBackoff_1 = __nccwpck_require__(799);
+const abort_1 = __nccwpck_require__(3296);
+const Event_1 = __nccwpck_require__(3091);
+const delay = (duration, unref) => new Promise(resolve => {
+    const timer = setTimeout(resolve, duration);
+    if (unref) {
+        timer.unref();
+    }
+});
+class RetryPolicy {
+    constructor(options, executor) {
+        this.options = options;
+        this.executor = executor;
+        this.onGiveUpEmitter = new Event_1.EventEmitter();
+        this.onRetryEmitter = new Event_1.EventEmitter();
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+        /**
+         * Emitter that fires when we retry a call, before any backoff.
+         *
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onRetry = this.onRetryEmitter.addListener;
+        /**
+         * Emitter that fires when we're no longer retrying a call and are giving up.
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onGiveUp = this.onGiveUpEmitter.addListener;
+    }
+    /**
+     * Sets the number of retry attempts for the function.
+     * @param count Retry attempts to make
+     */
+    attempts(count) {
+        return this.composeBackoff('a', new ConstantBackoff_1.ConstantBackoff(1, count));
+    }
+    /**
+     * Sets the delay between retries. Can be a single duration, of a list of
+     * durations. If it's a list, it will also determine the number of backoffs.
+     */
+    delay(amount) {
+        return this.composeBackoff('b', typeof amount === 'number' ? new ConstantBackoff_1.ConstantBackoff(amount) : new IterableBackoff_1.IterableBackoff(amount));
+    }
+    /**
+     * Sets the baackoff to use for retries.
+     */
+    delegate(backoff) {
+        return this.composeBackoff('b', new DelegateBackoff_1.DelegateBackoff(backoff));
+    }
+    /**
+     * Uses an exponential backoff for retries.
+     */
+    exponential(options = {}) {
+        return this.composeBackoff('b', new Backoff_1.ExponentialBackoff(options));
+    }
+    /**
+     * Sets the baackoff to use for retries.
+     */
+    backoff(backoff) {
+        return this.composeBackoff('b', backoff);
+    }
+    /**
+     * When retrying, a referenced timer is created. This means the Node.js event
+     * loop is kept active while we're delaying a retried call. Calling this
+     * method on the retry builder will unreference the timer, allowing the
+     * process to exit even if a retry might still be pending.
+     */
+    dangerouslyUnref() {
+        return this.derivePolicy({ ...this.options, unref: true });
+    }
+    /**
+     * Executes the given function with retries.
+     * @param fn Function to run
+     * @returns a Promise that resolves or rejects with the function results.
+     */
+    async execute(fn, signal = abort_1.neverAbortedSignal) {
+        const factory = this.options.backoff || new ConstantBackoff_1.ConstantBackoff(0, 1);
+        let backoff;
+        for (let retries = 0;; retries++) {
+            const result = await this.executor.invoke(fn, { attempt: retries, signal });
+            if ('success' in result) {
+                return result.success;
+            }
+            if (!signal.aborted) {
+                const context = { attempt: retries + 1, signal, result };
+                if (retries === 0) {
+                    backoff = factory.next(context);
+                }
+                else if (backoff) {
+                    backoff = backoff.next(context);
+                }
+                if (backoff) {
+                    const delayDuration = backoff.duration;
+                    const delayPromise = delay(delayDuration, !!this.options.unref);
+                    // A little sneaky reordering here lets us use Sinon's fake timers
+                    // when we get an emission in our tests.
+                    this.onRetryEmitter.emit({ ...result, delay: delayDuration });
+                    await delayPromise;
+                    continue;
+                }
+            }
+            this.onGiveUpEmitter.emit(result);
+            if ('error' in result) {
+                throw result.error;
+            }
+            return result.value;
+        }
+    }
+    composeBackoff(bias, backoff) {
+        if (this.options.backoff) {
+            backoff = new CompositeBackoff_1.CompositeBackoff(bias, this.options.backoff, backoff);
+        }
+        return this.derivePolicy({ ...this.options, backoff });
+    }
+    derivePolicy(newOptions) {
+        const p = new RetryPolicy(newOptions, this.executor.derive());
+        p.onRetry(evt => this.onRetryEmitter.emit(evt));
+        return p;
+    }
+}
+exports.RetryPolicy = RetryPolicy;
+//# sourceMappingURL=RetryPolicy.js.map
+
+/***/ }),
+
+/***/ 8965:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TimeoutPolicy = exports.TimeoutStrategy = void 0;
+const abort_1 = __nccwpck_require__(3296);
+const Event_1 = __nccwpck_require__(3091);
+const Executor_1 = __nccwpck_require__(5504);
+const TaskCancelledError_1 = __nccwpck_require__(5750);
+var TimeoutStrategy;
+(function (TimeoutStrategy) {
+    /**
+     * Cooperative timeouts will simply revoke the inner cancellation token,
+     * assuming the caller handles cancellation and throws or returns appropriately.
+     */
+    TimeoutStrategy["Cooperative"] = "optimistic";
+    /**
+     * Aggressive cancellation immediately throws
+     */
+    TimeoutStrategy["Aggressive"] = "aggressive";
+})(TimeoutStrategy = exports.TimeoutStrategy || (exports.TimeoutStrategy = {}));
+class TimeoutPolicy {
+    constructor(duration, strategy, executor = new Executor_1.ExecuteWrapper(), unref = false) {
+        this.duration = duration;
+        this.strategy = strategy;
+        this.executor = executor;
+        this.unref = unref;
+        this.timeoutEmitter = new Event_1.EventEmitter();
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onTimeout = this.timeoutEmitter.addListener;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.executor.onFailure;
+        /**
+         * @inheritdoc
+         */
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.executor.onSuccess;
+    }
+    /**
+     * When timing out, a referenced timer is created. This means the Node.js
+     * event loop is kept active while we're waiting for the timeout, as long as
+     * the function hasn't returned. Calling this method on the timeout builder
+     * will unreference the timer, allowing the process to exit even if a
+     * timeout might still be happening.
+     */
+    dangerouslyUnref() {
+        const t = new TimeoutPolicy(this.duration, this.strategy, this.executor, true);
+        return t;
+    }
+    /**
+     * Executes the given function.
+     * @param fn Function to execute. Takes in a nested cancellation token.
+     * @throws a {@link TaskCancelledError} if a timeout occurs
+     */
+    async execute(fn, signal) {
+        const aborter = (0, abort_1.deriveAbortController)(signal);
+        const timer = setTimeout(() => aborter.abort(), this.duration);
+        if (this.unref) {
+            timer.unref();
+        }
+        const context = { signal: aborter.signal };
+        const onCancelledListener = () => this.timeoutEmitter.emit();
+        aborter.signal.addEventListener('abort', onCancelledListener);
+        try {
+            if (this.strategy === TimeoutStrategy.Cooperative) {
+                return (0, Executor_1.returnOrThrow)(await this.executor.invoke(fn, context, aborter.signal));
+            }
+            return await this.executor
+                .invoke(async () => Promise.race([
+                Promise.resolve(fn(context, aborter.signal)),
+                (0, abort_1.waitForAbort)(aborter.signal).then(() => {
+                    throw new TaskCancelledError_1.TaskCancelledError(`Operation timed out after ${this.duration}ms`);
+                }),
+            ]))
+                .then(Executor_1.returnOrThrow);
+        }
+        finally {
+            aborter.signal.removeEventListener('abort', onCancelledListener);
+            aborter.abort();
+            clearTimeout(timer);
+        }
+    }
+}
+exports.TimeoutPolicy = TimeoutPolicy;
+//# sourceMappingURL=TimeoutPolicy.js.map
+
+/***/ }),
+
+/***/ 812:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__exportStar(__nccwpck_require__(9283), exports);
+__exportStar(__nccwpck_require__(4130), exports);
+__exportStar(__nccwpck_require__(6139), exports);
+__exportStar(__nccwpck_require__(4626), exports);
+__exportStar(__nccwpck_require__(5100), exports);
+__exportStar(__nccwpck_require__(799), exports);
+//# sourceMappingURL=Backoff.js.map
+
+/***/ }),
+
+/***/ 9283:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.CompositeBackoff = void 0;
+/**
+ * A backoff that combines two other backoffs. The delay will be the "bias"
+ * (max or min) of the two other backoffs, and next() will return as along as
+ * both backoffs continue to have next values as well.
+ */
+class CompositeBackoff {
+    constructor(bias, backoffA, backoffB) {
+        this.bias = bias;
+        this.backoffA = backoffA;
+        this.backoffB = backoffB;
+    }
+    /**
+     * @inheritdoc
+     */
+    next(context) {
+        const nextA = this.backoffA.next(context);
+        const nextB = this.backoffB.next(context);
+        return nextA && nextB && instance(this.bias, nextA, nextB);
+    }
+}
+exports.CompositeBackoff = CompositeBackoff;
+const instance = (bias, backoffA, backoffB) => ({
+    /**
+     * @inheritdoc
+     */
+    get duration() {
+        switch (bias) {
+            case 'a':
+                return backoffA.duration;
+            case 'b':
+                return backoffB.duration;
+            case 'max':
+                return Math.max(backoffB.duration, backoffA.duration);
+            case 'min':
+                return Math.min(backoffB.duration, backoffA.duration);
+            default:
+                throw new Error(`Unknown bias "${bias}" given to CompositeBackoff`);
+        }
+    },
+    /**
+     * @inheritdoc
+     */
+    next(context) {
+        const nextA = backoffA.next(context);
+        const nextB = backoffB.next(context);
+        return nextA && nextB && instance(bias, nextA, nextB);
+    },
+});
+//# sourceMappingURL=CompositeBackoff.js.map
+
+/***/ }),
+
+/***/ 4130:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.NeverRetryBackoff = exports.ConstantBackoff = void 0;
+/**
+ * Backoff that returns a constant interval.
+ */
+class ConstantBackoff {
+    constructor(interval, limit) {
+        this.interval = interval;
+        this.limit = limit;
+    }
+    /**
+     * @inheritdoc
+     */
+    next() {
+        return instance(this.interval, this.limit);
+    }
+}
+exports.ConstantBackoff = ConstantBackoff;
+/**
+ * Backoff that never retries.
+ */
+exports.NeverRetryBackoff = new ConstantBackoff(0, 0);
+const instance = (interval, limit, index = 0) => ({
+    duration: interval,
+    next() {
+        if (limit === undefined) {
+            return this;
+        }
+        if (index >= limit - 1) {
+            return undefined;
+        }
+        return instance(interval, limit, index + 1);
+    },
+});
+//# sourceMappingURL=ConstantBackoff.js.map
+
+/***/ }),
+
+/***/ 6139:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.DelegateBackoff = void 0;
+/**
+ * Backoff that delegates to a user-provided function. The function takes
+ * the backoff context, and can optionally take (and return) a state value
+ * that will be passed into subsequent backoff requests.
+ */
+class DelegateBackoff {
+    constructor(fn) {
+        this.fn = fn;
+    }
+    /**
+     * @inheritdoc
+     */
+    next(context) {
+        return instance(this.fn).next(context);
+    }
+}
+exports.DelegateBackoff = DelegateBackoff;
+const instance = (fn, state, current = 0) => ({
+    duration: current,
+    next(context) {
+        const result = fn(context, state);
+        if (result === undefined) {
+            return undefined;
+        }
+        return typeof result === 'number'
+            ? instance(fn, state, result)
+            : instance(fn, result.state, result.delay);
+    },
+});
+//# sourceMappingURL=DelegateBackoff.js.map
+
+/***/ }),
+
+/***/ 4626:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExponentialBackoff = void 0;
+const ExponentialBackoffGenerators_1 = __nccwpck_require__(5100);
+const defaultOptions = {
+    generator: ExponentialBackoffGenerators_1.decorrelatedJitterGenerator,
+    maxDelay: 30000,
+    maxAttempts: Infinity,
+    exponent: 2,
+    initialDelay: 128,
+};
+/**
+ * An implementation of exponential backoff.
+ */
+class ExponentialBackoff {
+    constructor(options) {
+        this.options = options ? { ...defaultOptions, ...options } : defaultOptions;
+    }
+    next() {
+        return instance(this.options).next(undefined);
+    }
+}
+exports.ExponentialBackoff = ExponentialBackoff;
+/**
+ * An implementation of exponential backoff.
+ */
+const instance = (options, state, delay = 0, attempt = -1) => ({
+    duration: delay,
+    next() {
+        if (attempt >= options.maxAttempts - 1) {
+            return undefined;
+        }
+        const [nextDelay, nextState] = options.generator(state, options);
+        return instance(options, nextState, nextDelay, attempt + 1);
+    },
+});
+//# sourceMappingURL=ExponentialBackoff.js.map
+
+/***/ }),
+
+/***/ 5100:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.decorrelatedJitterGenerator = exports.halfJitterGenerator = exports.fullJitterGenerator = exports.noJitterGenerator = void 0;
+/**
+ * Generator that creates a backoff with no jitter.
+ */
+const noJitterGenerator = (attempts = 0, options) => [
+    Math.min(options.maxDelay, options.initialDelay * 2 ** attempts),
+    attempts + 1,
+];
+exports.noJitterGenerator = noJitterGenerator;
+/**
+ * Generator that randomizes an exponential backoff between [0, delay).
+ */
+const fullJitterGenerator = (state, options) => {
+    const [delay, next] = (0, exports.noJitterGenerator)(state, options);
+    return [Math.floor(Math.random() * delay), next];
+};
+exports.fullJitterGenerator = fullJitterGenerator;
+/**
+ * Generator that randomizes an exponential backoff between [0, delay).
+ */
+const halfJitterGenerator = (attempts, options) => {
+    const [delay, next] = (0, exports.noJitterGenerator)(attempts, options);
+    return [Math.floor((delay + Math.random() * delay) / 2), next];
+};
+exports.halfJitterGenerator = halfJitterGenerator;
+/**
+ * A factor used within the formula to help smooth the first calculated delay.
+ */
+const pFactor = 4.0;
+/**
+ *  A factor used to scale the median values of the retry times generated by
+ * the formula to be _near_ whole seconds, to aid user comprehension. This
+ * factor allows the median values to fall approximately at 1, 2, 4 etc
+ * seconds, instead of 1.4, 2.8, 5.6, 11.2.
+ */
+const rpScalingFactor = 1 / 1.4;
+/**
+ * Decorrelated jitter. This should be considered the optimal Jitter stategy
+ * for most scenarios, as battle-tested in Polly.
+ *
+ * @see https://github.com/App-vNext/Polly/issues/530
+ * @see https://github.com/Polly-Contrib/Polly.Contrib.WaitAndRetry/blob/24cb116a2a320e82b01f57e13bfeaeff2725ccbf/src/Polly.Contrib.WaitAndRetry/Backoff.DecorrelatedJitterV2.cs
+ */
+const decorrelatedJitterGenerator = (state, options) => {
+    const [attempt, prev] = state || [0, 0];
+    const t = attempt + Math.random();
+    const next = Math.pow(options.exponent, t) * Math.tanh(Math.sqrt(pFactor * t));
+    const formulaIntrinsicValue = Math.max(0, next - prev);
+    return [
+        Math.min(formulaIntrinsicValue * rpScalingFactor * options.initialDelay, options.maxDelay),
+        [attempt + 1, next],
+    ];
+};
+exports.decorrelatedJitterGenerator = decorrelatedJitterGenerator;
+//# sourceMappingURL=ExponentialBackoffGenerators.js.map
+
+/***/ }),
+
+/***/ 799:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.IterableBackoff = void 0;
+/**
+ * Backoff that returns a number from an iterable.
+ */
+class IterableBackoff {
+    constructor(durations) {
+        this.durations = durations;
+    }
+    /**
+     * @inheritdoc
+     */
+    next() {
+        return instance(this.durations, 0);
+    }
+}
+exports.IterableBackoff = IterableBackoff;
+const instance = (durations, index) => ({
+    duration: durations[index],
+    next: () => (index < durations.length - 1 ? instance(durations, index + 1) : undefined),
+});
+//# sourceMappingURL=IterableBackoff.js.map
+
+/***/ }),
+
+/***/ 8850:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__exportStar(__nccwpck_require__(9621), exports);
+__exportStar(__nccwpck_require__(9327), exports);
+//# sourceMappingURL=Breaker.js.map
+
+/***/ }),
+
+/***/ 9327:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ConsecutiveBreaker = void 0;
+/**
+ * ConsecutiveBreaker breaks if more than `threshold` exceptions are received
+ * over a time period.
+ */
+class ConsecutiveBreaker {
+    constructor(threshold) {
+        this.threshold = threshold;
+        this.count = 0;
+    }
+    /**
+     * @inheritdoc
+     */
+    success() {
+        this.count = 0;
+    }
+    /**
+     * @inheritdoc
+     */
+    failure() {
+        return ++this.count >= this.threshold;
+    }
+}
+exports.ConsecutiveBreaker = ConsecutiveBreaker;
+//# sourceMappingURL=ConsecutiveBreaker.js.map
+
+/***/ }),
+
+/***/ 9621:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.SamplingBreaker = void 0;
+const CircuitBreakerPolicy_1 = __nccwpck_require__(8234);
+/**
+ * SamplingBreaker breaks if more than `threshold` percentage of calls over the
+ * last `samplingDuration`, so long as there's at least `minimumRps` (to avoid
+ * closing unnecessarily under low RPS).
+ */
+class SamplingBreaker {
+    constructor({ threshold, duration: samplingDuration, minimumRps }) {
+        this.windows = [];
+        this.currentWindow = 0;
+        this.currentFailures = 0;
+        this.currentSuccesses = 0;
+        if (threshold <= 0 || threshold >= 1) {
+            throw new RangeError(`SamplingBreaker threshold should be between (0, 1), got ${threshold}`);
+        }
+        this.threshold = threshold;
+        // at least 5 windows, max 1 second each:
+        const windowCount = Math.max(5, Math.ceil(samplingDuration / 1000));
+        for (let i = 0; i < windowCount; i++) {
+            this.windows.push({ startedAt: 0, failures: 0, successes: 0 });
+        }
+        this.windowSize = Math.round(samplingDuration / windowCount);
+        this.duration = this.windowSize * windowCount;
+        if (minimumRps) {
+            this.minimumRpms = minimumRps / 1000;
+        }
+        else {
+            // for our rps guess, set it so at least 5 failures per second
+            // are needed to open the circuit
+            this.minimumRpms = 5 / (threshold * 1000);
+        }
+    }
+    /**
+     * @inheritdoc
+     */
+    success(state) {
+        if (state === CircuitBreakerPolicy_1.CircuitState.HalfOpen) {
+            this.resetWindows();
+        }
+        this.push(true);
+    }
+    /**
+     * @inheritdoc
+     */
+    failure(state) {
+        this.push(false);
+        if (state !== CircuitBreakerPolicy_1.CircuitState.Closed) {
+            return true;
+        }
+        const total = this.currentSuccesses + this.currentFailures;
+        // If we don't have enough rps, then the circuit is open.
+        // 1. `total / samplingDuration` gets rps
+        // 2. We want `rpms < minimumRpms`
+        // 3. Simplifies to `total < samplingDuration * minimumRps`
+        if (total < this.duration * this.minimumRpms) {
+            return false;
+        }
+        // If we're above threshold, open the circuit
+        // 1. `failures / total > threshold`
+        // 2. `failures > threshold * total`
+        if (this.currentFailures > this.threshold * total) {
+            return true;
+        }
+        return false;
+    }
+    resetWindows() {
+        this.currentFailures = 0;
+        this.currentSuccesses = 0;
+        for (const window of this.windows) {
+            window.failures = 0;
+            window.successes = 0;
+            window.startedAt = 0;
+        }
+    }
+    rotateWindow(now) {
+        const next = (this.currentWindow + 1) % this.windows.length;
+        this.currentFailures -= this.windows[next].failures;
+        this.currentSuccesses -= this.windows[next].successes;
+        const window = (this.windows[next] = { failures: 0, successes: 0, startedAt: now });
+        this.currentWindow = next;
+        return window;
+    }
+    push(success) {
+        const now = Date.now();
+        // Get the current time period window, advance if necessary
+        let window = this.windows[this.currentWindow];
+        if (now - window.startedAt >= this.windowSize) {
+            window = this.rotateWindow(now);
+        }
+        // Increment current counts
+        if (success) {
+            window.successes++;
+            this.currentSuccesses++;
+        }
+        else {
+            window.failures++;
+            this.currentFailures++;
+        }
+    }
+}
+exports.SamplingBreaker = SamplingBreaker;
+//# sourceMappingURL=SamplingBreaker.js.map
+
+/***/ }),
+
+/***/ 3091:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.MemorizingEventEmitter = exports.EventEmitter = exports.Event = exports.noopDisposable = void 0;
+const TaskCancelledError_1 = __nccwpck_require__(5750);
+exports.noopDisposable = { dispose: () => undefined };
+// tslint:disable-next-line: no-namespace
+var Event;
+(function (Event) {
+    /**
+     * Adds a handler that handles one event on the emitter.
+     */
+    Event.once = (event, listener) => {
+        let syncDispose = false;
+        let disposable;
+        disposable = event(value => {
+            listener(value);
+            if (disposable) {
+                disposable.dispose();
+            }
+            else {
+                syncDispose = true; // callback can fire before disposable is returned
+            }
+        });
+        if (syncDispose) {
+            disposable.dispose();
+            return exports.noopDisposable; // no reason to keep the ref around
+        }
+        return disposable;
+    };
+    /**
+     * Returns a promise that resolves when the event fires, or when cancellation
+     * is requested, whichever happens first.
+     */
+    Event.toPromise = (event, signal) => {
+        if (!signal) {
+            return new Promise(resolve => Event.once(event, resolve));
+        }
+        if (signal.aborted) {
+            return Promise.reject(new TaskCancelledError_1.TaskCancelledError());
+        }
+        return new Promise((resolve, reject) => {
+            const d2 = Event.once(event, data => {
+                signal.removeEventListener('abort', d1);
+                resolve(data);
+            });
+            const d1 = () => {
+                d2.dispose();
+                signal.removeEventListener('abort', d1);
+                reject(new TaskCancelledError_1.TaskCancelledError());
+            };
+            signal.addEventListener('abort', d1);
+        });
+    };
+})(Event = exports.Event || (exports.Event = {}));
+/**
+ * Base event emitter. Calls listeners when data is emitted.
+ */
+class EventEmitter {
+    constructor() {
+        /**
+         * Event<T> function.
+         */
+        this.addListener = listener => this.addListenerInner(listener);
+    }
+    /**
+     * Gets the number of event listeners.
+     */
+    get size() {
+        if (!this.listeners) {
+            return 0;
+        }
+        else if (typeof this.listeners === 'function') {
+            return 1;
+        }
+        else {
+            return this.listeners.length;
+        }
+    }
+    /**
+     * Emits event data.
+     */
+    emit(value) {
+        if (!this.listeners) {
+            // no-op
+        }
+        else if (typeof this.listeners === 'function') {
+            this.listeners(value);
+        }
+        else {
+            for (const listener of this.listeners) {
+                listener(value);
+            }
+        }
+    }
+    addListenerInner(listener) {
+        if (!this.listeners) {
+            this.listeners = listener;
+        }
+        else if (typeof this.listeners === 'function') {
+            this.listeners = [this.listeners, listener];
+        }
+        else {
+            this.listeners.push(listener);
+        }
+        return { dispose: () => this.removeListener(listener) };
+    }
+    removeListener(listener) {
+        if (!this.listeners) {
+            return;
+        }
+        if (typeof this.listeners === 'function') {
+            if (this.listeners === listener) {
+                this.listeners = undefined;
+            }
+            return;
+        }
+        const index = this.listeners.indexOf(listener);
+        if (index === -1) {
+            return;
+        }
+        if (this.listeners.length === 2) {
+            this.listeners = index === 0 ? this.listeners[1] : this.listeners[0];
+        }
+        else {
+            this.listeners = this.listeners.slice(0, index).concat(this.listeners.slice(index + 1));
+        }
+    }
+}
+exports.EventEmitter = EventEmitter;
+/**
+ * An event emitter that memorizes and instantly re-emits its last value
+ * to attached listeners.
+ */
+class MemorizingEventEmitter extends EventEmitter {
+    constructor() {
+        super(...arguments);
+        /**
+         * @inheritdoc
+         */
+        this.addListener = listener => {
+            const disposable = this.addListenerInner(listener);
+            if (this.lastValue) {
+                listener(this.lastValue.value);
+            }
+            return disposable;
+        };
+    }
+    /**
+     * Gets whether this emitter has yet emitted any event.
+     */
+    get hasEmitted() {
+        return !!this.lastValue;
+    }
+    /**
+     * @inheritdoc
+     */
+    emit(value) {
+        this.lastValue = { value };
+        super.emit(value);
+    }
+}
+exports.MemorizingEventEmitter = MemorizingEventEmitter;
+//# sourceMappingURL=Event.js.map
+
+/***/ }),
+
+/***/ 5504:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExecuteWrapper = exports.returnOrThrow = void 0;
+const Event_1 = __nccwpck_require__(3091);
+const returnOrThrow = (failure) => {
+    if ('error' in failure) {
+        throw failure.error;
+    }
+    if ('success' in failure) {
+        return failure.success;
+    }
+    return failure.value;
+};
+exports.returnOrThrow = returnOrThrow;
+const makeStopwatch = () => {
+    if (typeof performance !== 'undefined') {
+        const start = performance.now();
+        return () => performance.now() - start;
+    }
+    else {
+        const start = process.hrtime.bigint();
+        return () => Number(process.hrtime.bigint() - start) / 1000000; // ns->ms
+    }
+};
+class ExecuteWrapper {
+    constructor(errorFilter = () => false, resultFilter = () => false) {
+        this.errorFilter = errorFilter;
+        this.resultFilter = resultFilter;
+        this.successEmitter = new Event_1.EventEmitter();
+        this.failureEmitter = new Event_1.EventEmitter();
+        // tslint:disable-next-line: member-ordering
+        this.onSuccess = this.successEmitter.addListener;
+        // tslint:disable-next-line: member-ordering
+        this.onFailure = this.failureEmitter.addListener;
+    }
+    derive() {
+        const e = new ExecuteWrapper(this.errorFilter, this.resultFilter);
+        e.onSuccess(evt => this.successEmitter.emit(evt));
+        e.onFailure(evt => this.failureEmitter.emit(evt));
+        return e;
+    }
+    async invoke(fn, ...args) {
+        const stopwatch = this.successEmitter.size || this.failureEmitter.size ? makeStopwatch() : null;
+        try {
+            const value = await fn(...args);
+            if (!this.resultFilter(value)) {
+                if (stopwatch) {
+                    this.successEmitter.emit({ duration: stopwatch() });
+                }
+                return { success: value };
+            }
+            if (stopwatch) {
+                this.failureEmitter.emit({ duration: stopwatch(), handled: true, reason: { value } });
+            }
+            return { value };
+        }
+        catch (rawError) {
+            const error = rawError;
+            const handled = this.errorFilter(error);
+            if (stopwatch) {
+                this.failureEmitter.emit({ duration: stopwatch(), handled, reason: { error } });
+            }
+            if (!handled) {
+                throw error;
+            }
+            return { error };
+        }
+    }
+}
+exports.ExecuteWrapper = ExecuteWrapper;
+//# sourceMappingURL=Executor.js.map
+
+/***/ }),
+
+/***/ 3296:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+// Temporary augmentation for TS since @types/node lacks the AbortSignal type,
+// and depending on the target milage may vary...
+// https://github.com/DefinitelyTyped/DefinitelyTyped/blob/d5323665619bd6034643f11291c1b1405f1f8790/types/node/globals.d.ts#L45-L57
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.waitForAbort = exports.deriveAbortController = exports.abortedSignal = exports.neverAbortedSignal = void 0;
+exports.neverAbortedSignal = new AbortController().signal;
+const cancelledSrc = new AbortController();
+cancelledSrc.abort();
+exports.abortedSignal = cancelledSrc.signal;
+/**
+ * Creates a new AbortController that is aborted when the parent signal aborts.
+ * @private
+ */
+const deriveAbortController = (signal) => {
+    const ctrl = new AbortController();
+    if (!signal) {
+        return ctrl;
+    }
+    if (signal.aborted) {
+        ctrl.abort();
+    }
+    const l = () => ctrl.abort();
+    signal.addEventListener('abort', l);
+    ctrl.signal.addEventListener('abort', () => signal.removeEventListener('abort', l));
+    return ctrl;
+};
+exports.deriveAbortController = deriveAbortController;
+const waitForAbort = (signal) => {
+    if (signal.aborted) {
+        return Promise.resolve();
+    }
+    return new Promise(resolve => {
+        const l = () => {
+            resolve();
+            signal.removeEventListener('abort', l);
+        };
+        signal.addEventListener('abort', l);
+    });
+};
+exports.waitForAbort = waitForAbort;
+//# sourceMappingURL=abort.js.map
+
+/***/ }),
+
+/***/ 2957:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.defer = void 0;
+const defer = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { resolve: resolve, reject: reject, promise };
+};
+exports.defer = defer;
+//# sourceMappingURL=defer.js.map
+
+/***/ }),
+
+/***/ 2128:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.BrokenCircuitError = void 0;
+/**
+ * Exception thrown from {@link CircuitBreakerPolicy.execute} when the
+ * circuit breaker is open.
+ */
+class BrokenCircuitError extends Error {
+    constructor(message = 'Execution prevented because the circuit breaker is open') {
+        super(message);
+        this.isBrokenCircuitError = true;
+    }
+}
+exports.BrokenCircuitError = BrokenCircuitError;
+//# sourceMappingURL=BrokenCircuitError.js.map
+
+/***/ }),
+
+/***/ 3212:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.BulkheadRejectedError = void 0;
+class BulkheadRejectedError extends Error {
+    constructor(executionSlots, queueSlots) {
+        super(`Bulkhead capacity exceeded (0/${executionSlots} execution slots, 0/${queueSlots} available)`);
+        this.isBulkheadRejectedError = true;
+    }
+}
+exports.BulkheadRejectedError = BulkheadRejectedError;
+//# sourceMappingURL=BulkheadRejectedError.js.map
+
+/***/ }),
+
+/***/ 2266:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isTaskCancelledError = exports.isIsolatedCircuitError = exports.isBulkheadRejectedError = exports.isBrokenCircuitError = void 0;
+__exportStar(__nccwpck_require__(2128), exports);
+__exportStar(__nccwpck_require__(3212), exports);
+__exportStar(__nccwpck_require__(5298), exports);
+__exportStar(__nccwpck_require__(5750), exports);
+const isBrokenCircuitError = (e) => !!e && e instanceof Error && 'isBrokenCircuitError' in e;
+exports.isBrokenCircuitError = isBrokenCircuitError;
+const isBulkheadRejectedError = (e) => !!e && e instanceof Error && 'isBulkheadRejectedError' in e;
+exports.isBulkheadRejectedError = isBulkheadRejectedError;
+const isIsolatedCircuitError = (e) => !!e && e instanceof Error && 'isBulkheadRejectedError' in e;
+exports.isIsolatedCircuitError = isIsolatedCircuitError;
+const isTaskCancelledError = (e) => !!e && e instanceof Error && 'isBulkheadRejectedError' in e;
+exports.isTaskCancelledError = isTaskCancelledError;
+//# sourceMappingURL=Errors.js.map
+
+/***/ }),
+
+/***/ 5298:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.IsolatedCircuitError = void 0;
+const BrokenCircuitError_1 = __nccwpck_require__(2128);
+/**
+ * Exception thrown from {@link CircuitBreakerPolicy.execute} when the
+ * circuit breaker is open.
+ */
+class IsolatedCircuitError extends BrokenCircuitError_1.BrokenCircuitError {
+    constructor() {
+        super(`Execution prevented because the circuit breaker is open`);
+        this.isIsolatedCircuitError = true;
+    }
+}
+exports.IsolatedCircuitError = IsolatedCircuitError;
+//# sourceMappingURL=IsolatedCircuitError.js.map
+
+/***/ }),
+
+/***/ 5750:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TaskCancelledError = void 0;
+/**
+ * Error thrown when a task is cancelled.
+ */
+class TaskCancelledError extends Error {
+    constructor(message = 'Operation cancelled') {
+        super(message);
+        this.message = message;
+        this.isTaskCancelledError = true;
+    }
+}
+exports.TaskCancelledError = TaskCancelledError;
+//# sourceMappingURL=TaskCancelledError.js.map
+
+/***/ }),
+
+/***/ 5826:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.EventEmitter = exports.Event = void 0;
+__exportStar(__nccwpck_require__(812), exports);
+__exportStar(__nccwpck_require__(8850), exports);
+__exportStar(__nccwpck_require__(2791), exports);
+__exportStar(__nccwpck_require__(8234), exports);
+var Event_1 = __nccwpck_require__(3091);
+Object.defineProperty(exports, "Event", ({ enumerable: true, get: function () { return Event_1.Event; } }));
+Object.defineProperty(exports, "EventEmitter", ({ enumerable: true, get: function () { return Event_1.EventEmitter; } }));
+__exportStar(__nccwpck_require__(2266), exports);
+__exportStar(__nccwpck_require__(4629), exports);
+__exportStar(__nccwpck_require__(5498), exports);
+__exportStar(__nccwpck_require__(3202), exports);
+__exportStar(__nccwpck_require__(4797), exports);
+__exportStar(__nccwpck_require__(8965), exports);
+//# sourceMappingURL=index.js.map
 
 /***/ }),
 
