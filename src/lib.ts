@@ -2,10 +2,23 @@
 import 'global-agent/bootstrap'
 import * as core from '@actions/core'
 import * as glob from '@actions/glob'
+import {SemVer, parse as parseSemver, rcompare as rcompareSemver} from 'semver'
 import {Policy} from 'cockatiel'
 import fetch from 'node-fetch-cjs'
 import fs from 'fs'
 import path from 'path'
+import {determineVersionBase} from './semver'
+
+export interface Version {
+  version: string
+  version_clean: string
+  codename: string
+  is_stable: boolean
+  is_beta: boolean
+  is_hidden: boolean
+  is_deprecated: boolean
+}
+
 export interface SlimDoc {
   title: string
   _id: string
@@ -126,6 +139,71 @@ export type RequestKey = keyof Request
 const True = 'true'
 
 export async function processRequest(input: Request): Promise<void> {
+  const versions = (await fetch(`https://dash.readme.com/api/v1/version`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Basic ${input.apiKey}`
+    }
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`${res.status}: ${body}`)
+      } else {
+        return res
+      }
+    })
+    .then(async res => await res.json())) as Version[]
+
+  const orderedVersions = versions
+    .map(v => ({...v, semver: parseSemver(v.version_clean)}))
+    .filter(v => v.semver !== null)
+    .sort((a, b) => rcompareSemver(a.semver as SemVer, b.semver as SemVer))
+
+  core.info(
+    `📃 Found versions: ${orderedVersions.map(v => v.version).join(', ')}`
+  )
+
+  if (versions.findIndex(v => v.version === input.version) === -1) {
+    const targetVersion = parseSemver(input.version) as SemVer
+    const baseVersion = determineVersionBase(
+      targetVersion,
+      orderedVersions.map(v => v.semver as SemVer)
+    )
+    const baseVersionName = orderedVersions.find(
+      v => v.semver?.raw == baseVersion.raw
+    )?.version
+
+    core.warning(
+      `⚠️  Failed to find version, it will be created from ${baseVersionName}`
+    )
+
+    const res = await fetch(`https://dash.readme.com/api/v1/version`, {
+      method: 'POST',
+      body: JSON.stringify({
+        version: input.version,
+        codename: `v${input.version}`,
+        from: orderedVersions[0].version,
+        is_stable: false,
+        is_beta: false,
+        is_hidden: true
+      }),
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${input.apiKey}`
+      }
+    })
+
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(`${res.status}: ${body}`)
+    }
+
+    core.info(`📃 Version ${input.version} created`)
+  }
+
   const options = {
     method: 'GET',
     headers: {
