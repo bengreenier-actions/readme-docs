@@ -79,7 +79,7 @@ function processRequest(input) {
             const targetVersion = (0, semver_1.parse)(input.version);
             const baseVersion = (0, semver_2.determineVersionBase)(targetVersion, orderedVersions.map(v => v.semver));
             const baseVersionName = (_a = orderedVersions.find(v => { var _a; return ((_a = v.semver) === null || _a === void 0 ? void 0 : _a.raw) == baseVersion.raw; })) === null || _a === void 0 ? void 0 : _a.version;
-            core.warning(`⚠️ Failed to find version, it will be created from ${baseVersionName}`);
+            core.warning(`⚠️  Failed to find version, it will be created from ${baseVersionName}`);
             const res = yield (0, node_fetch_cjs_1.default)(`https://dash.readme.com/api/v1/version`, {
                 method: 'POST',
                 body: JSON.stringify({
